@@ -16,7 +16,7 @@
     <script>
         let scene, camera, renderer, player, car, clock, controls, carControls;
         let isInCar = false;
-        const carPosition = new THREE.Vector3(10, 0, 0); // Position of the car
+        const carPosition = new THREE.Vector3(10, 0, 0); // Initial position of the car
 
         // Movement-related variables
         const velocity = new THREE.Vector3();
@@ -157,7 +157,7 @@
                 carControls = new THREE.Object3D();
                 carControls.position.copy(car.position);
                 scene.add(carControls);
-                camera.position.set(car.position.x, car.position.y + 1.6, car.position.z + 2); // Position inside the car
+                camera.position.set(car.position.x, car.position.y + 1.6, car.position.z + 2); // Position inside the car at a specific seat (adjust this as needed)
             }
         }
 
