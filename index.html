@@ -78,8 +78,8 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        // Event listeners for keyboard input
-        document.addEventListener("keydown", (event) => {
+        // Key event handlers
+        function onKeyDown(event) {
             keys[event.key.toLowerCase()] = true; // Mark key as pressed
 
             // Jumping logic
@@ -89,11 +89,11 @@
                     isJumping = true; // Set jumping flag
                 }
             }
-        });
+        }
 
-        document.addEventListener("keyup", (event) => {
+        function onKeyUp(event) {
             keys[event.key.toLowerCase()] = false; // Mark key as released
-        });
+        }
 
         // Function to move the player
         function movePlayer(delta) {
