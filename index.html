@@ -11,6 +11,7 @@
 </head>
 <body>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Import PointerLockControls from examples folder -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/controls/PointerLockControls.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/loaders/GLTFLoader.js"></script>
     <script>
@@ -35,6 +36,8 @@
 
             // Set up PointerLockControls for looking around
             controls = new THREE.PointerLockControls(camera, renderer.domElement);
+
+            // When the user clicks on the canvas, lock the pointer
             document.addEventListener('click', () => {
                 controls.lock();
             });
