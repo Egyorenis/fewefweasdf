@@ -3,21 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Three.js Car Driving</title>
+    <title>Three.js Car Driving with Pointer Lock</title>
     <style>
         body { margin: 0; overflow: hidden; }
         canvas { display: block; }
     </style>
 </head>
 <body>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- Import OrbitControls from the examples folder -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/examples/js/controls/PointerLockControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/examples/js/loaders/GLTFLoader.js"></script>
     <script>
         let scene, camera, renderer, player, car, clock, controls, carControls;
         let isInCar = false;
         const carPosition = new THREE.Vector3(10, 0, 0); // Position of the car
+
+        // Movement-related variables
+        const velocity = new THREE.Vector3();
+        const direction = new THREE.Vector3();
+        const keys = {}; // To track key presses
+        let isJumping = false; // Flag to prevent double jumping
+        const GRAVITY = -9.8; // Gravity constant
+        let verticalVelocity = 0; // Vertical speed of the player (for gravity and jumping)
 
         // Initialize scene, camera, and renderer
         function init() {
@@ -32,13 +39,11 @@
             // Set up player
             player = new THREE.Object3D();
             scene.add(player);
-            camera.position.set(0, 1.6, 0); // Camera at eye level
+            camera.position.set(0, 1.7, 0); // Camera at eye level
 
-            // Set up OrbitControls for looking around (no pointer lock)
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true; // Enable smooth camera transitions
-            controls.dampingFactor = 0.25; // Set damping speed
-            controls.screenSpacePanning = false; // Disable screen-space panning
+            // Set up PointerLockControls for FPS movement
+            controls = new THREE.PointerLockControls(camera, document.body);
+            document.body.addEventListener("click", () => controls.lock());
 
             // Set up basic lighting
             const light = new THREE.AmbientLight(0x404040); // Ambient light
@@ -73,72 +78,81 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        // Variables for movement
-        const moveSpeed = 0.1;
-        const turnSpeed = 0.1;
-        let moveForward = false;
-        let moveBackward = false;
-        let moveLeft = false;
-        let moveRight = false;
-        let canDrive = false;
+        // Event listeners for keyboard input
+        document.addEventListener("keydown", (event) => {
+            keys[event.key.toLowerCase()] = true; // Mark key as pressed
 
-        // Player movement logic
-        function onKeyDown(event) {
-            switch (event.code) {
-                case 'KeyW':
-                    moveForward = true;
-                    break;
-                case 'KeyS':
-                    moveBackward = true;
-                    break;
-                case 'KeyA':
-                    moveLeft = true;
-                    break;
-                case 'KeyD':
-                    moveRight = true;
-                    break;
-                case 'KeyE':
-                    if (canDrive) {
-                        toggleCarControl();
-                    }
-                    break;
+            // Jumping logic
+            if (event.key.toLowerCase() === " ") {
+                if (!isJumping) { // Check if already jumping
+                    verticalVelocity = 5; // Jump force
+                    isJumping = true; // Set jumping flag
+                }
             }
-        }
+        });
 
-        function onKeyUp(event) {
-            switch (event.code) {
-                case 'KeyW':
-                    moveForward = false;
-                    break;
-                case 'KeyS':
-                    moveBackward = false;
-                    break;
-                case 'KeyA':
-                    moveLeft = false;
-                    break;
-                case 'KeyD':
-                    moveRight = false;
-                    break;
+        document.addEventListener("keyup", (event) => {
+            keys[event.key.toLowerCase()] = false; // Mark key as released
+        });
+
+        // Function to move the player
+        function movePlayer(delta) {
+            direction.set(0, 0, 0); // Reset movement direction
+
+            // WASD movement
+            if (keys["w"]) direction.z -= 1; // Move forward
+            if (keys["s"]) direction.z += 1; // Move backward
+            if (keys["a"]) direction.x -= 1; // Strafe left
+            if (keys["d"]) direction.x += 1; // Strafe right
+
+            // Normalize direction for smooth diagonal movement
+            direction.normalize();
+
+            // Determine movement speed (walking speed)
+            const movementSpeed = 3;
+
+            // Compute movement in world space
+            const cameraDirection = new THREE.Vector3();
+            camera.getWorldDirection(cameraDirection);
+            cameraDirection.y = 0; // Remove vertical component
+            cameraDirection.normalize();
+
+            const forward = new THREE.Vector3(cameraDirection.x, 0, cameraDirection.z).normalize();
+            const right = new THREE.Vector3().crossVectors(camera.up, forward).normalize();
+
+            velocity.set(0, 0, 0); // Reset velocity
+            if (keys["w"]) velocity.add(forward); // Add forward movement
+            if (keys["s"]) velocity.add(forward.negate()); // Add backward movement
+            if (keys["a"]) velocity.add(right.negate()); // Add left movement
+            if (keys["d"]) velocity.add(right); // Add right movement
+
+            velocity.normalize().multiplyScalar(movementSpeed * delta); // Scale by speed and delta time
+
+            // Apply gravity
+            verticalVelocity += GRAVITY * delta; // Update vertical velocity
+            camera.position.y += verticalVelocity * delta; // Apply vertical movement
+
+            // Check for ground collision (prevent falling through)
+            if (camera.position.y < 1.7) {
+                camera.position.y = 1.7; // Reset to ground level
+                verticalVelocity = 0; // Stop downward movement
+                isJumping = false; // Reset jumping flag
             }
+
+            // Apply horizontal movement
+            camera.position.add(velocity);
         }
 
-        function movePlayer() {
-            if (moveForward) player.position.z -= moveSpeed;
-            if (moveBackward) player.position.z += moveSpeed;
-            if (moveLeft) player.position.x -= moveSpeed;
-            if (moveRight) player.position.x += moveSpeed;
-        }
-
-        // Car movement logic
+        // Player movement and car interaction
         function toggleCarControl() {
             if (isInCar) {
                 // Exit the car
                 isInCar = false;
-                controls.enabled = true;  // Re-enable OrbitControls
+                controls.enabled = true;  // Re-enable PointerLockControls
             } else {
                 // Enter the car
                 isInCar = true;
-                controls.enabled = false; // Disable OrbitControls while driving
+                controls.enabled = false; // Disable PointerLockControls while driving
                 carControls = new THREE.Object3D();
                 carControls.position.copy(car.position);
                 scene.add(carControls);
@@ -149,26 +163,33 @@
         // Car control movement
         function controlCar() {
             if (isInCar) {
-                if (moveForward) car.position.z -= moveSpeed;
-                if (moveBackward) car.position.z += moveSpeed;
-                if (moveLeft) car.rotation.y += turnSpeed;
-                if (moveRight) car.rotation.y -= turnSpeed;
+                if (keys["w"]) car.position.z -= 0.1;
+                if (keys["s"]) car.position.z += 0.1;
+                if (keys["a"]) car.rotation.y += 0.05;
+                if (keys["d"]) car.rotation.y -= 0.05;
             }
         }
 
-        // Animate loop
+        // Call movePlayer in the main animation loop
         function animate() {
-            requestAnimationFrame(animate);
+            const delta = clock.getDelta(); // Time elapsed between frames
 
             if (!isInCar) {
-                movePlayer(); // Move the player around
+                movePlayer(delta); // Handle player movement
             } else {
-                controlCar(); // Control the car
+                controlCar(); // Handle car movement
             }
 
-            controls.update(); // Update the controls for smooth transitions
             renderer.render(scene, camera);
+            requestAnimationFrame(animate);
         }
+
+        // Key event listeners to trigger car interaction
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'e') {
+                toggleCarControl(); // Enter or exit the car when 'E' is pressed
+            }
+        });
 
         init();
     </script>
