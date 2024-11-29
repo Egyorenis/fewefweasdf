@@ -11,8 +11,8 @@
 </head>
 <body>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- Import PointerLockControls from examples folder -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/controls/PointerLockControls.js"></script>
+    <!-- Import OrbitControls instead of PointerLockControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/loaders/GLTFLoader.js"></script>
     <script>
         let scene, camera, renderer, player, car, clock, controls, carControls;
@@ -34,13 +34,11 @@
             scene.add(player);
             camera.position.set(0, 1.6, 0); // Camera at eye level
 
-            // Set up PointerLockControls for looking around
-            controls = new THREE.PointerLockControls(camera, renderer.domElement);
-
-            // When the user clicks on the canvas, lock the pointer
-            document.addEventListener('click', () => {
-                controls.lock();
-            });
+            // Set up OrbitControls for looking around (no pointer lock)
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true; // Enable smooth camera transitions
+            controls.dampingFactor = 0.25; // Set damping speed
+            controls.screenSpacePanning = false; // Disable screen-space panning
 
             // Set up basic lighting
             const light = new THREE.AmbientLight(0x404040); // Ambient light
@@ -136,11 +134,11 @@
             if (isInCar) {
                 // Exit the car
                 isInCar = false;
-                controls.lock();
+                controls.enabled = true;  // Re-enable OrbitControls
             } else {
                 // Enter the car
                 isInCar = true;
-                controls.unlock();
+                controls.enabled = false; // Disable OrbitControls while driving
                 carControls = new THREE.Object3D();
                 carControls.position.copy(car.position);
                 scene.add(carControls);
@@ -168,6 +166,7 @@
                 controlCar(); // Control the car
             }
 
+            controls.update(); // Update the controls for smooth transitions
             renderer.render(scene, camera);
         }
 
