@@ -3,165 +3,172 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Car Driving and Walking</title>
+    <title>Three.js Car Driving</title>
     <style>
         body { margin: 0; overflow: hidden; }
         canvas { display: block; }
     </style>
-    <link rel="icon" href="data:,"> <!-- Suppress favicon error -->
 </head>
 <body>
-    <script type="module">
-        // Import three.js and GLTFLoader using CDN links
-        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js';
-        import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/GLTFLoader.js';
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/controls/PointerLockControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/loaders/GLTFLoader.js"></script>
+    <script>
+        let scene, camera, renderer, player, car, clock, controls, carControls;
+        let isInCar = false;
+        const carPosition = new THREE.Vector3(10, 0, 0); // Position of the car
 
-        let scene, camera, renderer, car, clock, player, controls;
-        let carObject, carSpeed = 0, isDriving = false, isNearCar = false;
-        let carPosition, carRotation;
-        let raycaster, mouse, carBoundingBox, playerPosition;
+        // Initialize scene, camera, and renderer
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
 
-        // Setup scene
-        scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87ceeb); // Sky color
-        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 1.6, 0); // Position the camera to simulate first-person view
+            clock = new THREE.Clock();
 
-        // Setup renderer
-        renderer = new THREE.WebGLRenderer();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+            // Set up player
+            player = new THREE.Object3D();
+            scene.add(player);
+            camera.position.set(0, 1.6, 0); // Camera at eye level
 
-        // Load the car model
-        const loader = new GLTFLoader();
-        loader.load('models/volkswagen_golf_mk.i_low_poly.glb', (gltf) => {
-            carObject = gltf.scene;
-            scene.add(carObject);
-            carPosition = carObject.position;
-            carRotation = carObject.rotation;
+            // Set up PointerLockControls for looking around
+            controls = new THREE.PointerLockControls(camera, renderer.domElement);
+            document.addEventListener('click', () => {
+                controls.lock();
+            });
 
-            // Set car bounding box for proximity detection
-            const box = new THREE.Box3().setFromObject(carObject);
-            carBoundingBox = box;
-        });
+            // Set up basic lighting
+            const light = new THREE.AmbientLight(0x404040); // Ambient light
+            scene.add(light);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1); // Directional light
+            directionalLight.position.set(1, 1, 1).normalize();
+            scene.add(directionalLight);
 
-        // Create a basic player object (you can use any 3D object here)
-        player = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
-        player.position.set(0, 0.5, 0); // Starting position of the player
-        scene.add(player);
+            // Load the car model
+            const loader = new THREE.GLTFLoader();
+            loader.load('models/volkswagen_golf_mk.i_low_poly.glb', (gltf) => {
+                car = gltf.scene;
+                car.scale.set(0.5, 0.5, 0.5); // Scale the car to a reasonable size
+                car.position.set(carPosition.x, carPosition.y, carPosition.z);
+                scene.add(car);
+            });
 
-        // Setup raycaster and mouse position for interaction
-        raycaster = new THREE.Raycaster();
-        mouse = new THREE.Vector2();
+            // Set up key event listeners for player movement
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
 
-        // Setup clock for animation timing
-        clock = new THREE.Clock();
+            // Resize handling
+            window.addEventListener('resize', onWindowResize, false);
 
-        // Pointer Lock Controls (for looking around and movement)
-        controls = new THREE.PointerLockControls(camera, renderer.domElement);
+            animate();
+        }
 
-        // Enable pointer lock when clicked
-        document.body.addEventListener('click', () => {
-            controls.lock();
-        });
+        // Handle window resizing
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
 
-        // Setup movement variables
-        const velocity = new THREE.Vector3();
-        const direction = new THREE.Vector3();
-        const walkSpeed = 5;
+        // Variables for movement
+        const moveSpeed = 0.1;
+        const turnSpeed = 0.1;
+        let moveForward = false;
+        let moveBackward = false;
+        let moveLeft = false;
+        let moveRight = false;
+        let canDrive = false;
 
-        // Movement event listeners
-        window.addEventListener('keydown', onKeyDown);
-        window.addEventListener('keyup', onKeyUp);
-
-        let keys = {};
+        // Player movement logic
         function onKeyDown(event) {
-            keys[event.key] = true;
+            switch (event.code) {
+                case 'KeyW':
+                    moveForward = true;
+                    break;
+                case 'KeyS':
+                    moveBackward = true;
+                    break;
+                case 'KeyA':
+                    moveLeft = true;
+                    break;
+                case 'KeyD':
+                    moveRight = true;
+                    break;
+                case 'KeyE':
+                    if (canDrive) {
+                        toggleCarControl();
+                    }
+                    break;
+            }
         }
 
         function onKeyUp(event) {
-            keys[event.key] = false;
-        }
-
-        // Detect when the player is near the car
-        function detectCarProximity() {
-            const playerBox = new THREE.Box3().setFromObject(player);
-            return carBoundingBox.intersectsBox(playerBox);
-        }
-
-        // Handle key interactions (for entering/exiting the car)
-        window.addEventListener('keydown', (event) => {
-            if (event.key === 'e' && isNearCar && !isDriving) {
-                enterCar();
-            } else if (event.key === 'e' && isDriving) {
-                exitCar();
+            switch (event.code) {
+                case 'KeyW':
+                    moveForward = false;
+                    break;
+                case 'KeyS':
+                    moveBackward = false;
+                    break;
+                case 'KeyA':
+                    moveLeft = false;
+                    break;
+                case 'KeyD':
+                    moveRight = false;
+                    break;
             }
-        });
-
-        function enterCar() {
-            isDriving = true;
-            controls.unlock(); // Disable walking controls
-            camera.position.set(carPosition.x, carPosition.y + 1.6, carPosition.z); // Position camera inside car
-            carObject.add(camera); // Parent the camera to the car
         }
 
-        function exitCar() {
-            isDriving = false;
-            carObject.remove(camera); // Remove the camera from the car
-            controls.lock(); // Re-enable walking controls
+        function movePlayer() {
+            if (moveForward) player.position.z -= moveSpeed;
+            if (moveBackward) player.position.z += moveSpeed;
+            if (moveLeft) player.position.x -= moveSpeed;
+            if (moveRight) player.position.x += moveSpeed;
         }
 
-        // Update the player movement and the world
-        function updateMovement(delta) {
-            if (!isDriving) {
-                // Player walking movement
-                direction.set(0, 0, 0);
-
-                if (keys['w']) direction.z -= 1;
-                if (keys['s']) direction.z += 1;
-                if (keys['a']) direction.x -= 1;
-                if (keys['d']) direction.x += 1;
-
-                if (direction.length() > 0) {
-                    direction.normalize();
-                    velocity.addScaledVector(direction, walkSpeed * delta);
-                }
-
-                player.position.add(velocity);
-                velocity.multiplyScalar(0.9); // Friction
+        // Car movement logic
+        function toggleCarControl() {
+            if (isInCar) {
+                // Exit the car
+                isInCar = false;
+                controls.lock();
             } else {
-                // Car movement
-                if (keys['w']) carPosition.z -= 0.1; // Move the car forward
-                if (keys['s']) carPosition.z += 0.1; // Move the car backward
+                // Enter the car
+                isInCar = true;
+                controls.unlock();
+                carControls = new THREE.Object3D();
+                carControls.position.copy(car.position);
+                scene.add(carControls);
+                camera.position.set(car.position.x, car.position.y + 1.6, car.position.z + 3);
             }
         }
 
-        // Animation loop
+        // Car control movement
+        function controlCar() {
+            if (isInCar) {
+                if (moveForward) car.position.z -= moveSpeed;
+                if (moveBackward) car.position.z += moveSpeed;
+                if (moveLeft) car.rotation.y += turnSpeed;
+                if (moveRight) car.rotation.y -= turnSpeed;
+            }
+        }
+
+        // Animate loop
         function animate() {
             requestAnimationFrame(animate);
 
-            // Update delta time
-            const delta = clock.getDelta();
-            
-            // Detect proximity to the car
-            isNearCar = detectCarProximity();
+            if (!isInCar) {
+                movePlayer(); // Move the player around
+            } else {
+                controlCar(); // Control the car
+            }
 
-            // Update movement (either player walking or car driving)
-            updateMovement(delta);
-
-            // Render the scene
             renderer.render(scene, camera);
         }
 
-        animate();
-
-        // Adjust the camera when the window is resized
-        window.addEventListener('resize', () => {
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-        });
-
+        init();
     </script>
 </body>
 </html>
