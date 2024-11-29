@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Three.js Car Driving with Pointer Lock</title>
+    <title>Three.js Car Driving</title>
     <style>
         body { margin: 0; overflow: hidden; }
         canvas { display: block; }
@@ -14,40 +14,30 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/examples/js/controls/PointerLockControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/examples/js/loaders/GLTFLoader.js"></script>
     <script>
-        let scene, camera, renderer, player, car, clock, controls;
+        let scene, camera, renderer, car, clock, controls;
         let isInCar = false;
-
-        const carPosition = new THREE.Vector3(10, 0, 0); // Position of the car
-        const keys = {}; // To track key presses
-        const velocity = new THREE.Vector3();
-        const direction = new THREE.Vector3();
-        let isJumping = false;
-        const GRAVITY = -9.8;
-        let verticalVelocity = 0;
+        const keys = {};
 
         function init() {
-            // Initialize scene, camera, and renderer
+            // Initialize scene
             scene = new THREE.Scene();
+
+            // Initialize camera
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+            // Initialize renderer
             renderer = new THREE.WebGLRenderer();
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
-            clock = new THREE.Clock();
-
-            // Add ambient and directional light
+            // Lighting
             const light = new THREE.AmbientLight(0x404040);
             scene.add(light);
             const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
             directionalLight.position.set(1, 1, 1).normalize();
             scene.add(directionalLight);
 
-            // Set up player
-            player = new THREE.Object3D();
-            scene.add(player);
-            camera.position.set(0, 1.4, 0); // Position player camera slightly above the ground
-
-            // Set up PointerLockControls
+            // PointerLockControls
             controls = new THREE.PointerLockControls(camera, document.body);
             document.body.addEventListener("click", () => controls.lock());
 
@@ -55,18 +45,22 @@
             const loader = new THREE.GLTFLoader();
             loader.load('models/volkswagen_golf_mk.i_low_poly.glb', (gltf) => {
                 car = gltf.scene;
-                car.scale.set(0.5, 0.5, 0.5); // Adjust scale
-                car.position.copy(carPosition); // Set position
+                car.scale.set(0.5, 0.5, 0.5);
+                car.position.set(0, 0, 0);
                 scene.add(car);
             });
 
-            // Key listeners
+            // Event listeners
             document.addEventListener('keydown', onKeyDown);
             document.addEventListener('keyup', onKeyUp);
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'e') toggleCarControl();
+            });
 
             // Resize handling
-            window.addEventListener('resize', onWindowResize, false);
+            window.addEventListener('resize', onWindowResize);
 
+            clock = new THREE.Clock();
             animate();
         }
 
@@ -78,61 +72,10 @@
 
         function onKeyDown(event) {
             keys[event.key.toLowerCase()] = true;
-
-            if (event.key.toLowerCase() === " " && !isJumping) {
-                verticalVelocity = 5; // Jump
-                isJumping = true;
-            }
         }
 
         function onKeyUp(event) {
             keys[event.key.toLowerCase()] = false;
-        }
-
-        function movePlayer(delta) {
-            direction.set(0, 0, 0);
-
-            if (keys["w"]) direction.z -= 1;
-            if (keys["s"]) direction.z += 1;
-            if (keys["a"]) direction.x -= 1;
-            if (keys["d"]) direction.x += 1;
-
-            direction.normalize();
-
-            const speed = 3; // Movement speed
-            velocity.set(0, 0, 0);
-
-            const cameraDirection = new THREE.Vector3();
-            camera.getWorldDirection(cameraDirection);
-            cameraDirection.y = 0; // Ignore vertical component
-            const forward = new THREE.Vector3(cameraDirection.x, 0, cameraDirection.z).normalize();
-            const right = new THREE.Vector3().crossVectors(camera.up, forward).normalize();
-
-            if (keys["w"]) velocity.add(forward);
-            if (keys["s"]) velocity.add(forward.negate());
-            if (keys["a"]) velocity.add(right.negate());
-            if (keys["d"]) velocity.add(right);
-
-            velocity.normalize().multiplyScalar(speed * delta);
-            verticalVelocity += GRAVITY * delta;
-
-            camera.position.y += verticalVelocity * delta;
-            if (camera.position.y < 1.4) {
-                camera.position.y = 1.4;
-                verticalVelocity = 0;
-                isJumping = false;
-            }
-
-            camera.position.add(velocity);
-        }
-
-        function controlCar() {
-            if (isInCar) {
-                if (keys["w"]) car.position.z -= 0.1;
-                if (keys["s"]) car.position.z += 0.1;
-                if (keys["a"]) car.rotation.y += 0.05;
-                if (keys["d"]) car.rotation.y -= 0.05;
-            }
         }
 
         function toggleCarControl() {
@@ -140,34 +83,37 @@
                 // Exit the car
                 isInCar = false;
                 controls.enabled = true;
-                camera.position.set(car.position.x, car.position.y + 1.4, car.position.z + 3);
+                // Position camera near the car
+                camera.position.set(car.position.x, car.position.y + 1.6, car.position.z + 3);
+                camera.rotation.set(0, 0, 0);
             } else {
                 // Enter the car
                 isInCar = true;
                 controls.enabled = false;
-                camera.position.set(car.position.x, car.position.y + 1.6, car.position.z + 0.5);
-                camera.rotation.set(0, car.rotation.y, 0); // Align camera with car rotation
+                // Attach the camera to the car
+                car.add(camera);
+                camera.position.set(0, 1.5, -1.5); // Adjust to car interior
+                camera.rotation.set(0, 0, 0);
             }
+        }
+
+        function controlCar(delta) {
+            if (keys["w"]) car.translateZ(-5 * delta); // Forward
+            if (keys["s"]) car.translateZ(5 * delta); // Backward
+            if (keys["a"]) car.rotation.y += 2 * delta; // Turn left
+            if (keys["d"]) car.rotation.y -= 2 * delta; // Turn right
         }
 
         function animate() {
             const delta = clock.getDelta();
 
             if (isInCar) {
-                controlCar();
-            } else {
-                movePlayer(delta);
+                controlCar(delta);
             }
 
             renderer.render(scene, camera);
             requestAnimationFrame(animate);
         }
-
-        document.addEventListener('keydown', (event) => {
-            if (event.key.toLowerCase() === 'e') {
-                toggleCarControl();
-            }
-        });
 
         init();
     </script>
