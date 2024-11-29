@@ -36,10 +36,10 @@
 
             clock = new THREE.Clock();
 
-            // Set up player
+            // Set up player (scaled down to be smaller than the car)
             player = new THREE.Object3D();
             scene.add(player);
-            camera.position.set(0, 1.7, 0); // Camera at eye level
+            camera.position.set(0, 1.4, 0); // Adjusted to make the player slightly smaller
 
             // Set up PointerLockControls for FPS movement
             controls = new THREE.PointerLockControls(camera, document.body);
@@ -149,6 +149,7 @@
                 // Exit the car
                 isInCar = false;
                 controls.enabled = true;  // Re-enable PointerLockControls
+                camera.position.set(car.position.x, car.position.y + 1.4, car.position.z + 3); // Position outside the car
             } else {
                 // Enter the car
                 isInCar = true;
@@ -156,7 +157,7 @@
                 carControls = new THREE.Object3D();
                 carControls.position.copy(car.position);
                 scene.add(carControls);
-                camera.position.set(car.position.x, car.position.y + 1.6, car.position.z + 3);
+                camera.position.set(car.position.x, car.position.y + 1.6, car.position.z + 2); // Position inside the car
             }
         }
 
