@@ -51,6 +51,10 @@
                 car.scale.set(0.5, 0.5, 0.5);
                 car.position.set(0, 0, 0);
                 scene.add(car);
+
+                // Adjust camera mount position relative to the car
+                car.add(cameraMount);
+                cameraMount.position.set(0, 2, -1.5); // Raise mount above the ground
             });
 
             // Event listeners
@@ -87,7 +91,7 @@
                 isInCar = false;
                 controls.enabled = true;
                 // Remove the camera from the car mount
-                car.remove(cameraMount);
+                cameraMount.remove(camera);
                 scene.add(camera); // Add the camera back to the scene
                 camera.position.set(car.position.x, car.position.y + 1.6, car.position.z + 3);
                 camera.rotation.set(0, 0, 0);
@@ -95,10 +99,8 @@
                 // Enter the car
                 isInCar = true;
                 controls.enabled = false;
-                // Attach the camera mount to the car
-                car.add(cameraMount);
-                cameraMount.position.set(0, 3, -1.5); // Adjust mount height
-                cameraMount.add(camera); // Attach the camera to the mount
+                // Attach the camera to the mount
+                cameraMount.add(camera);
                 camera.position.set(0, 0, 0); // Reset camera relative to the mount
             }
         }
