@@ -14,7 +14,7 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/examples/js/controls/PointerLockControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/examples/js/loaders/GLTFLoader.js"></script>
     <script>
-        let scene, camera, renderer, car, clock, controls;
+        let scene, camera, renderer, car, clock, controls, cameraMount;
         let isInCar = false;
         const keys = {};
 
@@ -40,6 +40,9 @@
             // PointerLockControls
             controls = new THREE.PointerLockControls(camera, document.body);
             document.body.addEventListener("click", () => controls.lock());
+
+            // Create a camera mount
+            cameraMount = new THREE.Object3D();
 
             // Load car model
             const loader = new THREE.GLTFLoader();
@@ -83,17 +86,20 @@
                 // Exit the car
                 isInCar = false;
                 controls.enabled = true;
-                // Position camera near the car
+                // Remove the camera from the car mount
+                car.remove(cameraMount);
+                scene.add(camera); // Add the camera back to the scene
                 camera.position.set(car.position.x, car.position.y + 1.6, car.position.z + 3);
                 camera.rotation.set(0, 0, 0);
             } else {
                 // Enter the car
                 isInCar = true;
                 controls.enabled = false;
-                // Attach the camera to the car
-                car.add(camera);
-                camera.position.set(0, 333333333, -1.5); // Adjust to car interior
-                camera.rotation.set(0, 0, 0);
+                // Attach the camera mount to the car
+                car.add(cameraMount);
+                cameraMount.position.set(0, 1.8, -1.5); // Adjust mount height
+                cameraMount.add(camera); // Attach the camera to the mount
+                camera.position.set(0, 0, 0); // Reset camera relative to the mount
             }
         }
 
